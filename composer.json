@@ -3,6 +3,7 @@
   "description": "Basic package to add to other projects.",
   "keywords": ["template", "composer", "package"],
   "license": "AFL-3.0",
+  "version": ">=1.0",
   "authors": [
     {
       "name": "Nate Davis",
