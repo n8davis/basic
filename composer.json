@@ -11,7 +11,7 @@
     }
   ],
   "type": "project",
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "autoload": {
     "psr-0": {
       "Davis\\Basic\\": "src/"
