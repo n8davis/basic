@@ -1,0 +1,22 @@
+{
+  "name": "n8davis/basic",
+  "description": "Basic package to add to other projects.",
+  "keywords": ["template", "composer", "package"],
+  "license": "AFL-3.0",
+  "authors": [
+    {
+      "name": "Nate Davis",
+      "email": "n8davis@me.com"
+    }
+  ],
+  "type": "project",
+  "require": {
+    "php": ">=5.6"
+  },
+  "minimum-stability": "dev",
+  "autoload": {
+    "psr-0": {
+      "Davis\\Basic\\": "src/"
+    }
+  }
+}
