@@ -5,6 +5,7 @@ namespace Davis\Basic;
 
 class Assist
 {
+    CONST FROM = 'example@email.com';
 
     /**
      * @param $subject
@@ -14,8 +15,8 @@ class Assist
      */
     public static function email( $subject , $message , array $emails ){
         $headers = [
-            "From: " . env( 'MY_EMAIL' ),
-            "Reply-To: " . env( 'MY_EMAIL' )
+            "From: " . self::FROM,
+            "Reply-To: " . self::FROM
         ];
         $result = null;
         foreach ($emails as $email) $result = mail($email, $subject , $message, implode("\r\n", $headers));

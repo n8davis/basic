@@ -1,439 +1,398 @@
 <?php
 
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 class Ftp
 {
 
-    protected $connectionType = 'ftp';
-    protected $downloadDirectory = '/';
-    protected $errors = [];
-    protected $host = '';
-    protected $httpCode;
-    protected $logger;
-    protected $password = '';
-    protected $path;
-    protected $port = 21;
-    protected $results;
-    protected $uri = '';
-    protected $uploadDirectory = '/';
-    protected $username = '';
-    protected $upload;
-    protected $download;
-    protected $options ;
-    protected $header;
-    protected $body;
+    protected $connection ;
+    protected $isLoggedIn;
+    protected $port;
+    protected $host;
+    protected $username;
+    protected $password;
+    protected $files = [];
+    protected $is_secure;
+    protected $timeout = 5;
+    protected $directory;
 
-
-    public function __construct() {
-    }
-
-    private function options( $fileToUpload = false )
+    /**
+     * Ftp constructor.
+     * @param string $username
+     * @param string $password
+     * @param string $host
+     * @param string $port
+     * @param int $timeout
+     * @param bool $isSecure
+     */
+    public function __construct( string $username , string $password , string $host , string $port , int $timeout = 5 , bool $isSecure = true )
     {
+        $this->setHost( $host )
+            ->setUsername( $username )
+            ->setPassword( $password )
+            ->setPort( $port )
+            ->setTimeout( $timeout )
+            ->setIsSecure( $isSecure );
 
-        $options = array(
-            CURLOPT_USERPWD        => $this->getUsername().':'.$this->getPassword(),
-            CURLOPT_SSL_VERIFYPEER => 0,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_RETURNTRANSFER => 1,
-            CURLOPT_BINARYTRANSFER => 1,
-            CURLOPT_FTP_SSL        => CURLFTPSSL_ALL, // require SSL For both control and data connections
-            CURLOPT_FTPSSLAUTH     => CURLFTPAUTH_TLS, // let cURL choose the FTP authentication method (either SSL or TLS)
-            CURLOPT_PORT           => $this->getPort(),
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_URL            => $this->uri,
-            CURLOPT_HEADER         => false
-        );
-
-
-        if( $this->upload === true && $fileToUpload !== false && file_exists( $fileToUpload ) ) {
-            $fileInfo                      = pathinfo( $fileToUpload );
-            $options[ CURLOPT_URL ]        = $options[ CURLOPT_URL ]  . $fileInfo['basename'];
-            $fp                            = fopen( $fileToUpload, 'rb' );
-            $options[ CURLOPT_INFILE ]     = $fp ;
-            $options[ CURLOPT_UPLOAD ]     = true ;
-            $options[ CURLOPT_INFILESIZE ] = filesize( $fileToUpload ) ;
+        if( $this->getIsSecure() ) {
+            $this->setConnection( ftp_ssl_connect( $this->getHost() , $this->getPort() , $this->getTimeout() ) );
         }
-        if( $this->download === true ) {
-            $options[ CURLOPT_URL ]           .= $fileToUpload;
-            $options[ CURLOPT_UPLOAD ]         = false ;
-            $options[ CURLOPT_FOLLOWLOCATION ] = true  ;
-
+        else{
+            $this->setConnection( ftp_connect( $this->getHost() , $this->getPort() , $this->getTimeout() ) );
         }
 
-        $this->setOptions( $options ) ;
+        if( $this->getConnection() ) {
+            $isLoggedIn = ftp_login($this->getConnection(), $this->getUsername(), $this->getPassword());
+            $this->setIsLoggedIn($isLoggedIn);
+        }
 
-        return $options;
+        $this->setPassiveMode( true ) ;
+
     }
 
     /**
-     * @param bool $file
-     * @return $this
+     * @param $oldName
+     * @param $newName
+     * @return bool
      */
-    public function connect( $file = false ) {
+    public function rename( $oldName , $newName )
+    {
+
+        if( ! $this->getIsLoggedIn() ) return false ;
+
+        return ftp_rename( $this->getConnection() , $oldName , $newName ) ;
+
+    }
+
+    /**
+     * @param $remoteFile
+     * @param $downloadTo
+     * @return bool
+     */
+    public function download( $remoteFile , $downloadTo )
+    {
+        if( ! $this->getIsLoggedIn() ) return false ;
+
+        $localPath = rtrim( $downloadTo , '/' ) . DIRECTORY_SEPARATOR . ltrim( $remoteFile , '/' ) ;
+
+        $this->createIfNotExists( $localPath ) ;
+
+        if( is_dir( $localPath ) ) return false;
+
+        return ftp_get( $this->getConnection() , $localPath , $remoteFile , FTP_BINARY ) ;
+
+    }
+
+    /**
+     * @param $localFile
+     * @param $uploadTo
+     * @return bool
+     */
+    public function upload( $localFile , $uploadTo )
+    {
+
+        if( ! $this->getIsLoggedIn() ) return false ;
+
+        return ftp_put( $this->getConnection() , $uploadTo , $localFile, FTP_BINARY  );
+
+    }
+
+    /**
+     * @param $file
+     * @return bool
+     */
+    public function delete( $file )
+    {
+
+        if( ! $this->getIsLoggedIn() ) return false ;
+
+        return ftp_delete( $this->getConnection() , $file ) ;
+
+    }
+
+    /**
+     * @param $path
+     * @return bool
+     */
+    public function createIfNotExists( $path ){
+
+        $extensions = [ '.txt' , '.csv' , '.log' , '.jpg' , '.jpeg' , '.png' , '.gif' ];
+        $dir        = pathinfo( $path , PATHINFO_DIRNAME ) ;
 
 
-        try{
-            $this->uri =  $this->getConnectionType() . "://" . $this->getHost() . $this->getPath();
+        if( is_dir( $dir ) || file_exists( $dir ) ) return true;
 
+        if( $this->createIfNotExists( $dir ) ) {
+            // check if last part is a file
+            $parse   = explode( "/" , $path ) ;
+            $lastDir = array_pop( $parse ) ;
 
-            $curl = curl_init();
-            curl_setopt_array( $curl , $this->options( $file ) ) ;
-
-            $results = curl_exec( $curl );;
-            $info    = curl_getinfo( $curl );
-
-            $this->setHttpCode( array_key_exists( 'http_code' , $info ) ? $info[ 'http_code' ] : 0 );
-
-            if( $curlError = curl_errno( $curl ) > 0 ){
-                $this->addError( $curlError ) ;
-                return $this;
+            if( in_array( substr( $lastDir , -4 ) , $extensions ) ){
+                $this->createLocalFile( $path ) ;
+                return true;
             }
 
-            $header_size = curl_getinfo( $curl , CURLINFO_HEADER_SIZE );
-            $header      = substr( $results , 0, $header_size );
-            $body        = substr( $results , $header_size );
-            $this->setResults( $results )
-                ->setHeader( $header )
-                ->setBody( $body ) ;
-            return $this;
-        }
-        catch ( \Exception $exception ){
-            $this->addError( [ $exception->getMessage() ] ) ;
-            return $this;
+            if( mkdir( $path , 0775 , true ) ) return true;
+
         }
 
+        return false ;
     }
 
-    public function download( $file , $putContentsHere )
+    /**
+     * @param $path
+     * @return bool
+     */
+    public function createLocalFile( $path )
     {
-        $this->download = true;
-        $this->connect( $file ) ;
-
-        return file_put_contents( $putContentsHere , $this->getBody() ) ;
-    }
-
-
-    public function getFiles() {
 
         try {
+            if ( ! file_exists( $path ) ) {
+                $file = fopen( $path, 'w' );
+                fwrite( $file, "" );
+                fclose( $file );
 
-            $this->uri =  $this->getConnectionType() . "://" . $this->getHost() . $this->getPath();
-            $ch        = curl_init();
+                return true;
 
-            curl_setopt_array( $ch , $this->options() ) ;
-
-            $result = curl_exec( $ch );
-
-            if ( ! curl_errno( $ch ) ) {
-                $matches = [];
-                try {
-                    $lines = explode( "\n", $result );
-
-                    foreach ( $lines as $line ) {
-                        $parse = explode(" " , $line ) ;
-
-                        if ( ! empty( $parse ) ) {
-
-                            $filename  = $parse[ count( $parse ) - 1 ];
-                            if( strlen( $filename ) === 0 ) continue;
-                            if( strpos( $filename , '.txt' ) === false ) continue;
-                            $matches[] = $filename;
-                        }
-                    }
-                } catch ( \Exception $e ) {
-                    Assist::display( $e->getMessage() );
-                }
-
-                return $matches;
-            }
-            else {
-                $error = curl_error( $ch );
-                Assist::display( $this->uri );
-                Assist::display( 'Error downloading file: ' . $error );
-
-                return [];
             }
 
-        } catch ( \Exception $e ) {
-            Assist::display( $e->getMessage() );
         }
+        catch ( \Exception $exception ){}
 
-        return [];
-
-    }
-
-
-    public function upload( $file )
-    {
-        $this->upload = true;
-        return $this->connect( $file );
-    }
-
-
-    /**
-     * @return string
-     */
-    public function getUploadDirectory() {
-        return $this->uploadDirectory;
+        return false;
     }
 
     /**
-     * @param $uploadDirectory
+     * Gets files from given directory
+     *
+     * @param string $directory
      * @return $this
      */
-    public function setUploadDirectory( $uploadDirectory ) {
-        $this->uploadDirectory = $uploadDirectory;
+    public function getFilesFromDirectory( string $directory )
+    {
+        if( ! $this->getIsLoggedIn() ) return $this;
+
+        $this->setDirectory( $directory ) ;
+
+        $contents = ftp_nlist( $this->getConnection() , $directory ) ;
+
+        foreach( $contents as $content ) $this->addFile( $content );
+
         return $this;
     }
 
     /**
-     * @return string
+     * Closes Ftp connection
+     *
+     * @return bool
      */
-    public function getDownloadDirectory() {
-        return $this->downloadDirectory;
+    public function close()
+    {
+        return ftp_close( $this->getConnection() ) ;
     }
 
     /**
-     * @param $downloadDirectory
-     * @return $this
+     * Declares passive mode
+     *
+     * @param bool $mode
+     * @return bool
      */
-    public function setDownloadDirectory( $downloadDirectory ) {
-        $this->downloadDirectory = $downloadDirectory;
+    public function setPassiveMode( bool $mode )
+    {
+        return ftp_pasv( $this->getConnection() , $mode ) ;
+    }
+
+    /**
+     * @return int
+     */
+    public function getTimeout()
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * @param int $timeout
+     * @return Ftp
+     */
+    public function setTimeout(int $timeout )
+    {
+        $this->timeout = $timeout;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getIsSecure()
+    {
+        return $this->is_secure;
+    }
+
+    /**
+     * @param mixed $is_secure
+     * @return Ftp
+     */
+    public function setIsSecure($is_secure)
+    {
+        $this->is_secure = $is_secure;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getConnection()
+    {
+        return $this->connection;
+    }
+
+    /**
+     * @param mixed $connection
+     * @return Ftp
+     */
+    public function setConnection($connection)
+    {
+        $this->connection = $connection;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getIsLoggedIn()
+    {
+        return $this->isLoggedIn;
+    }
+
+    /**
+     * @param mixed $isLoggedIn
+     * @return Ftp
+     */
+    public function setIsLoggedIn($isLoggedIn)
+    {
+        $this->isLoggedIn = $isLoggedIn;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getPort()
+    {
+        return $this->port;
+    }
+
+    /**
+     * @param mixed $port
+     * @return Ftp
+     */
+    public function setPort($port)
+    {
+        $this->port = $port;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getHost()
+    {
+        return $this->host;
+    }
+
+    /**
+     * @param mixed $host
+     * @return Ftp
+     */
+    public function setHost($host)
+    {
+        $this->host = $host;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getUsername()
+    {
+        return $this->username;
+    }
+
+    /**
+     * @param mixed $username
+     * @return Ftp
+     */
+    public function setUsername($username)
+    {
+        $this->username = $username;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getPassword()
+    {
+        return $this->password;
+    }
+
+    /**
+     * @param mixed $password
+     * @return Ftp
+     */
+    public function setPassword($password)
+    {
+        $this->password = $password;
         return $this;
     }
 
     /**
      * @return array
      */
-    public function getErrors() {
-        return $this->errors;
+    public function getFiles()
+    {
+        return $this->files;
     }
 
     /**
-     * @param $errors
-     * @return $this
+     * @param array $files
+     * @return Ftp
      */
-    public function setErrors( $errors ) {
-        $this->errors[] = $errors;
-        return $this;
-    }
-
-    public function addError( $error ){
-        $errors = $this->getErrors();
-        $errors[] = $error;
-        $this->setErrors( $errors ) ;
-        return $this;
-    }
-
-    
-    /**
-     * @return string
-     */
-    public function getHost() {
-        return $this->host;
-    }
-
-    /**
-     * @param $host
-     * @return $this
-     */
-    public function setHost( $host ) {
-        $this->host = $host;
+    public function setFiles(array $files)
+    {
+        $this->files = $files;
         return $this;
     }
 
     /**
-     * @return string
+     * @param $file
+     * @return array
      */
-    public function getUsername() {
-        return $this->username;
-    }
-
-    /**
-     * @param $username
-     * @return $this
-     */
-    public function setUsername( $username ) {
-        $this->username = $username;
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getPassword() {
-        return $this->password;
-    }
-
-    /**
-     * @param $password
-     * @return $this
-     */
-    public function setPassword( $password ) {
-        $this->password = $password;
-        return $this;
-    }
-
-    /**
-     * @return int
-     */
-    public function getPort() {
-        return $this->port;
-    }
-
-    /**
-     * @param $port
-     * @return $this
-     */
-    public function setPort( $port ) {
-        $this->port = $port;
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getConnectionType() {
-        return $this->connectionType;
-    }
-
-    /**
-     * @param $connectionType
-     * @return $this
-     */
-    public function setConnectionType( $connectionType ) {
-        $this->connectionType = $connectionType;
-        return $this;
+    public function addFile( $file )
+    {
+        $files = $this->getFiles();
+        $files[] = $file;
+        $this->setFiles( $files );
+        return $files;
     }
 
     /**
      * @return mixed
      */
-    public function getHttpCode()
+    public function getDirectory()
     {
-        return $this->httpCode;
+        return $this->directory;
     }
 
     /**
-     * @param mixed $httpCode
+     * @param mixed $directory
      * @return Ftp
      */
-    public function setHttpCode($httpCode)
+    public function setDirectory($directory)
     {
-        $this->httpCode = $httpCode;
+        $this->directory = $directory;
         return $this;
     }
-
-    /**
-     * @return mixed
-     */
-    public function getPath()
-    {
-        return $this->path;
-    }
-
-    /**
-     * @param mixed $path
-     * @return Ftp
-     */
-    public function setPath($path)
-    {
-        $this->path = $path;
-        return $this;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getResults()
-    {
-        return $this->results;
-    }
-
-    /**
-     * @param mixed $results
-     * @return Ftp
-     */
-    public function setResults($results)
-    {
-        $this->results = $results;
-        return $this;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getOptions()
-    {
-        return $this->options;
-    }
-
-    /**
-     * @param mixed $options
-     * @return Ftp
-     */
-    public function setOptions($options)
-    {
-        $this->options = $options;
-        return $this;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getHeader()
-    {
-        return $this->header;
-    }
-
-    /**
-     * @param mixed $header
-     * @return Ftp
-     */
-    public function setHeader($header)
-    {
-        $this->header = $header;
-        return $this;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getBody()
-    {
-        return $this->body;
-    }
-
-    /**
-     * @param mixed $body
-     * @return Ftp
-     */
-    public function setBody($body)
-    {
-        $this->body = $body;
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getUri()
-    {
-        return $this->uri;
-    }
-
-    /**
-     * @param string $uri
-     * @return Ftp
-     */
-    public function setUri(string $uri)
-    {
-        $this->uri = $uri;
-        return $this;
-    }
-
-
 
 
 }
