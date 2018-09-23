@@ -2,7 +2,7 @@
 
 namespace App\Manager\Basic;
 
-class XmlParser implements \JsonSerializable
+class XmlParser
 {
 
     protected $simpleXMLElement;
@@ -23,26 +23,6 @@ class XmlParser implements \JsonSerializable
     public function toJson()
     {
         return json_encode( $this->getSimpleXMLElement() ) ;
-    }
-
-    /**
-     * @return array|mixed
-     */
-    public function jsonSerialize()
-    {
-        $data = [];
-        foreach( get_object_vars($this) as $key => $value ){
-
-            if( is_null( $value ) || $key[ 0 ] === '_'  || empty( $value ) ) continue;
-
-            $method = 'get' . ucwords( $key, '_' );
-            $method = str_replace( '_', '', $method );
-
-            if( ! method_exists( $this , $method ) ) continue;
-
-            $data[ $key ] = $this->{ $method }( $value );
-        }
-        return $data;
     }
 
     /**
