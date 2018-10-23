@@ -1,8 +1,9 @@
 <?php
-
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 class Writer{
+
+    const APACHE_USER = 'ec2-user';
 
     public $delimiter = ',';
 
@@ -11,8 +12,11 @@ class Writer{
     protected $enclosure = '"';
     protected $includeHeader = false;
     protected $logger;
-    protected $fields = [];
+    public $fields = [];
     protected $_properties = [];
+
+    public function __construct(){}
+
 
     public function __call($method, $params)
     {
@@ -39,7 +43,9 @@ class Writer{
             $delimiter = $this->getDelimiter();
         }
 
-        if ($enclosure === null) $enclosure = chr( 0 );
+        if ($enclosure === null){
+            $enclosure = chr( 0 );
+        }
 
         $data = $this->toArray();
 
@@ -57,7 +63,9 @@ class Writer{
                 umask($oldmask);
             }
             $fp = fopen( $this->getFilename(), $mode);
-
+            chgrp( $this->getFilename() , self::APACHE_USER) ;
+            chown( $this->getFilename() , self::APACHE_USER ) ;
+            chmod( $this->getFilename(), 0777);
             $hasHeader = \fstat( $fp );
 
             if (!empty( $data )) {

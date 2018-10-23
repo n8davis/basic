@@ -1,11 +1,13 @@
 <?php
+namespace App\Manager\Basic;
 
-namespace Davis\Basic;
-
-
+/**
+ * Methods to assist programmatic processes
+ * Class Assist
+ * @package App\Manager\Basic
+ */
 class Assist
 {
-    CONST FROM = 'example@email.com';
 
     /**
      * @param $subject
@@ -15,12 +17,45 @@ class Assist
      */
     public static function email( $subject , $message , array $emails ){
         $headers = [
-            "From: " . self::FROM,
-            "Reply-To: " . self::FROM
+            "From: " . env( 'MY_EMAIL' ),
+            "Reply-To: " . env( 'MY_EMAIL' )
         ];
         $result = null;
         foreach ($emails as $email) $result = mail($email, $subject , $message, implode("\r\n", $headers));
         return $result;
+    }
+
+    public static function setter( string $value )
+    {
+        $method = 'set' . ucwords(  $value, '_' );
+        return str_replace( '_', '', $method );
+    }
+
+    public static function getter( string $value )
+    {
+        $method = 'get' . ucwords(  $value, '_' );
+        return str_replace( '_', '', $method );
+    }
+
+    public static function split_name($name) {
+        $parts = [];
+
+        while ( strlen( trim($name)) > 0 ) {
+            $name = trim($name);
+            $string = preg_replace('#.*\s([\w-]*)$#', '$1', $name);
+            $parts[] = $string;
+            $name = trim( preg_replace('#'.$string.'#', '', $name ) );
+        }
+
+        if ( empty( $parts ) )  return false;
+
+        $parts                 = array_reverse( $parts );
+        $name                  = [];
+        $name[ 'first_name' ]  = $parts[0];
+        $name[ 'middle_name' ] = ( isset( $parts[ 2 ] ) ) ? $parts[ 1 ] : '';
+        $name[ 'last_name' ]   = ( isset( $parts[ 2 ] ) ) ? $parts[ 2 ] : ( isset( $parts[ 1 ] ) ? $parts[ 1 ] : '' );
+
+        return $name;
     }
 
     /**
@@ -33,17 +68,17 @@ class Assist
 
         if (isset($_GET[$name])) return $_GET[$name];
 
-        if (empty( $name )) {
-            return $_REQUEST;
-        }
+        if (empty( $name )) return $_REQUEST;
+
         return null;
     }
-
+    
     /**
      * @param $object
      * @param bool $toJson
      * @return array|string
      */
+
     public static function convertToArray( $object , $toJson = FALSE  ) {
         $send             = [];
         $propertiesToSkip = [ 'shop' , 'access_token' ];
@@ -79,12 +114,6 @@ class Assist
         return $send ;
     }
 
-    /**
-     * @param $array
-     * @param $index
-     * @param $value
-     * @return null
-     */
     public static function objArraySearch($array, $index, $value)
     {
         foreach($array as $arrayInf) {
@@ -106,7 +135,6 @@ class Assist
         elseif( is_object( $object ) ) :
             return property_exists( $object , $property) ? $object->{ $property } : null;
         endif;
-        return null;
     }
 
     /**
@@ -138,14 +166,6 @@ class Assist
         $StrLen     = strlen($needle);
         $FullStrEnd = substr($FullStr, strlen($FullStr) - $StrLen);
         return $FullStrEnd == $needle;
-    }
-
-    /**
-     * @param $key
-     * @param $envContents
-     */
-    public static function getEnvValue( $key , $envContents ) {
-
     }
 
     /**

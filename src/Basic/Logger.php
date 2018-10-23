@@ -1,6 +1,5 @@
 <?php
-
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 
 class Logger
@@ -18,7 +17,7 @@ class Logger
 
 
         if( ! is_dir( $directory ) ){
-            mkdir( $directory , 0775 , true ) ;
+            mkdir( $directory , 0777 , true ) ;
 
             $htaccess = $directory . DIRECTORY_SEPARATOR . '.htaccess' ;
             $file     = fopen( $htaccess , 'w') ;
@@ -38,8 +37,9 @@ class Logger
         $time         = $date->format("M d, Y h:i:s A");
         $content      = "\n" . $time." - ". $content;
 
+        // check if
         if( ! is_dir( $dir = $logger->directory( $directory ) ) ){
-            mkdir( $dir , 0775 , true ) ;
+            mkdir( $dir , 0777 , true ) ;
             $htaccess = $dir . DIRECTORY_SEPARATOR . '.htaccess' ;
             $file     = fopen( $htaccess , 'w') ;
             fwrite( $file ,"deny from all" );

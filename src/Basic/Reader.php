@@ -1,24 +1,17 @@
 <?php
-
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 class Reader
 {
 
     protected $filename = '';
-    private $delimiter;
+    private $delimeter;
     protected $data = [];
-    protected $headers = [];
 
     protected $includeHeader;
 
-    public $_properties = [];
+    public $_properties;
 
-    /**
-     * @param $method
-     * @param $params
-     * @return mixed
-     */
     public function __call($method, $params)
     {
         $methodName = substr( $method, 3 );
@@ -35,8 +28,6 @@ class Reader
                 return call_user_func_array($func, $params);
             }
         }
-
-        return null;
     }
 
     /**
@@ -45,15 +36,16 @@ class Reader
     public function process() {
         if ( file_exists( $this->filename ) ) {
             $results = [];
+            $headers = [];
             $i      = - 1;
             $file   = fopen( $this->filename, 'r' );
-            while ( ( $line = fgetcsv( $file, 4096, $this->getDelimiter() ) ) !== false ) {
+            while ( ( $line = fgetcsv( $file, 4096, $this->getDelimeter() ) ) !== false ) {
                 if( $this->getIncludeHeader() === false && $i === - 1 ) {
                     if( is_array( $line ) && ! empty( $line ) ) {
                         foreach( $line as $index => $value ){
                             $method = 'set' . ucwords(  $value , '_' );
                             $method = str_replace( '_', '', $method );
-                            $this->headers[] = $method ;
+                            $headers[] = $method ;
                         }
                     }
 
@@ -62,8 +54,8 @@ class Reader
                 }
 
                 $entity = new self;
-                if( ! empty( $this->headers ) ){
-                    foreach( $this->headers as $index => $method ){
+                if( ! empty( $headers ) ){
+                    foreach( $headers as $index => $method ){
                         $entity->{$method}( $line[ $index ] );
                     }
                 }
@@ -99,16 +91,16 @@ class Reader
     /**
      * @return string
      */
-    public function getDelimiter() {
-        return $this->delimiter;
+    public function getDelimeter() {
+        return $this->delimeter;
     }
 
     /**
-     * @param $delimiter
+     * @param $delimeter
      * @return $this
      */
-    public function setDelimiter( $delimiter ) {
-        $this->delimiter = $delimiter;
+    public function setDelimeter( $delimeter ) {
+        $this->delimeter = $delimeter;
 
         return $this;
     }

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Manager\Basic;
 
 class Ftp
@@ -12,41 +11,51 @@ class Ftp
     protected $username;
     protected $password;
     protected $files = [];
-    protected $is_secure;
+    protected $is_secure = true ;
     protected $timeout = 5;
     protected $directory;
 
     /**
      * Ftp constructor.
-     * @param string $username
-     * @param string $password
-     * @param string $host
-     * @param string $port
-     * @param int $timeout
-     * @param bool $isSecure
+     * @param $host
+     * @param $user
+     * @param $password
+     * @param $port
      */
-    public function __construct( string $username , string $password , string $host , string $port , int $timeout = 5 , bool $isSecure = true )
+    public function __construct( $host , $user , $password , $port )
     {
-        $this->setHost( $host )
-            ->setUsername( $username )
-            ->setPassword( $password )
-            ->setPort( $port )
-            ->setTimeout( $timeout )
-            ->setIsSecure( $isSecure );
+        try {
 
-        if( $this->getIsSecure() ) {
-            $this->setConnection( ftp_ssl_connect( $this->getHost() , $this->getPort() , $this->getTimeout() ) );
-        }
-        else{
-            $this->setConnection( ftp_connect( $this->getHost() , $this->getPort() , $this->getTimeout() ) );
-        }
+            $this->setHost(trim( $host ) )
+                ->setUsername(trim( $user ) )
+                ->setPassword(trim( $password ) )
+                ->setPort( trim( $port ) )
+                ->setTimeout( $this->timeout )
+                ->setIsSecure( $this->is_secure );
 
-        if( $this->getConnection() ) {
-            $isLoggedIn = ftp_login($this->getConnection(), $this->getUsername(), $this->getPassword());
-            $this->setIsLoggedIn($isLoggedIn);
-        }
+            if ( $this->getIsSecure() ) {
+                $this->setConnection( ftp_ssl_connect($this->getHost(), $this->getPort(), $this->getTimeout()));
+            } else {
+                $this->setConnection( ftp_connect($this->getHost(), $this->getPort(), $this->getTimeout()));
+            }
 
-        $this->setPassiveMode( true ) ;
+            if ($this->getConnection() && $this->getUsername() && $this->getPassword()) {
+                try {
+                    $isLoggedIn = ftp_login($this->getConnection(), $this->getUsername(), $this->getPassword());
+                    $this->setIsLoggedIn($isLoggedIn);
+                } catch (\Exception $exception) {
+                    $message = $exception->getMessage() . ' [ TRACE ] ' . $exception->getTraceAsString();
+                    Logger::writeToLogFile($message, 'ftp');
+                    Assist::display($message);
+                }
+            }
+
+            $this->setPassiveMode(true);
+        }
+        catch ( \Exception $exception ){
+            $message = $this->shopOwner->shop . " There was an error with the Ftp Class " .PHP_EOL . $exception->getMessage() ;
+            Logger::writeToLogFile( $message ,'ftp') ;
+        }
 
     }
 
@@ -73,13 +82,14 @@ class Ftp
     {
         if( ! $this->getIsLoggedIn() ) return false ;
 
-        $localPath = rtrim( $downloadTo , '/' ) . DIRECTORY_SEPARATOR . ltrim( $remoteFile , '/' ) ;
+        $file = rtrim( $downloadTo , '/' ) . DIRECTORY_SEPARATOR . ltrim( $remoteFile , '/' ) ;
+        $file = explode( '/' , $file );
+        $file = $file[ count( $file ) - 1 ];
+        $this->createIfNotExists( $file ) ;
 
-        $this->createIfNotExists( $localPath ) ;
+        if( is_dir( $file ) ) return false;
 
-        if( is_dir( $localPath ) ) return false;
-
-        return ftp_get( $this->getConnection() , $localPath , $remoteFile , FTP_BINARY ) ;
+        return ftp_get( $this->getConnection() , $downloadTo . $file , $remoteFile , FTP_BINARY ) ;
 
     }
 
@@ -146,20 +156,14 @@ class Ftp
     public function createLocalFile( $path )
     {
 
-        try {
-            if ( ! file_exists( $path ) ) {
-                $file = fopen( $path, 'w' );
-                fwrite( $file, "" );
-                fclose( $file );
-
-                return true;
-
-            }
-
+        if( ! file_exists( $path ) ){
+            $file  = fopen( $path , 'w') ;
+            fwrite( $file ,"" );
+            fclose($file);
         }
-        catch ( \Exception $exception ){}
 
-        return false;
+        return true;
+
     }
 
     /**
@@ -168,7 +172,7 @@ class Ftp
      * @param string $directory
      * @return $this
      */
-    public function getFilesFromDirectory( string $directory )
+    public function getFilesFromDirectory( $directory )
     {
         if( ! $this->getIsLoggedIn() ) return $this;
 
@@ -176,7 +180,7 @@ class Ftp
 
         $contents = ftp_nlist( $this->getConnection() , $directory ) ;
 
-        foreach( $contents as $content ) $this->addFile( $content );
+        if( is_array( $contents ) ) foreach( $contents as $content ) $this->addFile( $content );
 
         return $this;
     }
@@ -184,10 +188,12 @@ class Ftp
     /**
      * Closes Ftp connection
      *
-     * @return bool
+     * @return bool|$this
      */
     public function close()
     {
+        if( ! $this->getIsLoggedIn() ) return $this;
+
         return ftp_close( $this->getConnection() ) ;
     }
 
@@ -197,8 +203,11 @@ class Ftp
      * @param bool $mode
      * @return bool
      */
-    public function setPassiveMode( bool $mode )
+    public function setPassiveMode( $mode )
     {
+
+        if( is_null( $this->getConnection() ) || is_bool( $this->getConnection() ) ) return false;
+
         return ftp_pasv( $this->getConnection() , $mode ) ;
     }
 
@@ -214,7 +223,7 @@ class Ftp
      * @param int $timeout
      * @return Ftp
      */
-    public function setTimeout(int $timeout )
+    public function setTimeout($timeout )
     {
         $this->timeout = $timeout;
         return $this;
@@ -393,6 +402,5 @@ class Ftp
         $this->directory = $directory;
         return $this;
     }
-
 
 }

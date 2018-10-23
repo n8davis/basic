@@ -1,34 +1,30 @@
 <?php
 
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 
 class Security {
 
     const ENCRYPTION_KEY = '+ew/T+rZDRwCrzZ3dykEL8wUnlwk4ZNOPJRBH8lRM5w=';
-    const SECRET_IV      = '5nkyCr1wqN4FeDQW6rpxyaAaNQrfjU+ZGMiadxwpZJQ=';
+    const SECRET_IV = '5nkyCr1wqN4FeDQW6rpxyaAaNQrfjU+ZGMiadxwpZJQ=';
 
-    /**
-     * @param $content
-     * @return string
-     */
     public static function encrypt($content)
     {
-        $encrypt_method = 'AES-256-CBC';
-        $key            = hash('sha256', Security::ENCRYPTION_KEY);
-        $iv             = substr(hash('sha256', Security::SECRET_IV), 0, 16);
+        $output = false;
 
-        $output         = openssl_encrypt($content, $encrypt_method, $key, 0, $iv);
-        $output         = base64_encode($output);
+        $encrypt_method = 'AES-256-CBC';
+        // hash
+        $key = hash('sha256', Security::ENCRYPTION_KEY);
+
+        $iv = substr(hash('sha256', Security::SECRET_IV), 0, 16);
+
+        $output = openssl_encrypt($content, $encrypt_method, $key, 0, $iv);
+        $output = base64_encode($output);
 
 
         return $output;
     }
 
-    /**
-     * @param $encrypted
-     * @return bool|string
-     */
     public static function decryptRJ256( $encrypted ) {
         //PHP strips "+" and replaces with " ", but we need "+" so add it back in...
         $encrypted = str_replace( ' ', '+', $encrypted );

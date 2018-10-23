@@ -1,6 +1,5 @@
 <?php
-
-namespace Davis\Basic;
+namespace App\Manager\Basic;
 
 
 class Status
@@ -87,6 +86,21 @@ class Status
      * An entity is in a IMPORTED status
      */
     const IMPORTED            = 14;
+
+    /**
+     * An entity that has been connected
+     */
+    const CONNECTED           = 15;
+
+    /**
+     * Ready to be imported
+     */
+    const QUEUED_FOR_IMPORT   = 16;
+
+    /**
+     * An entity is in a PROCESSING status
+     */
+    const PROCESSING          = 17;
 
     /**
      * Get statuses
