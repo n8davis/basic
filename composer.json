@@ -14,7 +14,19 @@
   "minimum-stability": "stable",
   "autoload": {
     "psr-0": {
-      "Davis\\Basic\\": "src/"
+      "App\\Manager\\Basic\\": "src/"
     }
-  }
+  },
+  "require": {
+    "n8davis/basic": "@dev"
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "https://github.com/n8davis/basic.git",
+      "options": {
+        "symlink": true
+      }
+    }
+  ]
 }
